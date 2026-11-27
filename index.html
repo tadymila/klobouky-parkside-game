@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>The Parkside</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: kreslený seriál ze dvorku, vtipný
+   IDEA: hra na dvorku, HUD jako dílenské cedule
+   PICTURE: 3D dvorek přes celou obrazovku
+   COLOUR and TYPE: dílenská zelená #1f4d3a, krémová #f4efe6, červená #c8202a; Rubik
+   LAYOUT: logo vlevo nahoře, minimapa vpravo nahoře, joystick vlevo dole, akce vpravo dole */
+:root{color-scheme:light;--acc:#1f4d3a;--cr:#f4efe6;--red:#c8202a}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;overflow:hidden;background:#bfe6ff;font:16px/1.4 Rubik,system-ui,sans-serif;color:#1d1b17;touch-action:none;user-select:none;-webkit-user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab}
+.top{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:12px max(3vw,12px);pointer-events:none}
+.logo{display:block;font-weight:800;font-size:clamp(22px,4vw,32px);line-height:1;color:#fff;text-shadow:0 3px 0 var(--acc),0 5px 12px #0004}
+#who{display:inline-block;margin-top:6px;background:var(--acc);color:#fff;font-weight:500;font-size:14px;padding:3px 10px;border-radius:999px}
+#clock{display:inline-block;margin-top:6px;background:#ffffffd9;color:#1f4d3a;font-weight:500;font-size:14px;padding:3px 10px;border-radius:999px}
+#mm{width:clamp(120px,18vw,170px);height:auto;border-radius:10px;border:3px solid #fff;box-shadow:0 4px 14px #0003}
+.bubble{position:fixed;font-weight:800;font-size:18px;background:#fff;padding:3px 10px;border-radius:12px;transform:translate(-50%,-100%);pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 3px 0 #0002}
+.bubble.on{opacity:1}
+.heart{position:fixed;transform:translate(-50%,-100%);font-size:26px;color:#ff4f8b;text-shadow:0 2px 0 #fff;pointer-events:none;opacity:0;transition:opacity .15s}.heart.on{opacity:1;animation:hb .7s ease-in-out infinite}.heart.big{font-size:42px}@keyframes hb{50%{transform:translate(-50%,-115%) scale(1.15)}}@media (prefers-reduced-motion:reduce){.heart.on{animation:none}}
+.toast{position:fixed;top:clamp(70px,12vh,110px);left:50%;transform:translate(-50%,-10px);max-width:min(94vw,720px);background:var(--cr);padding:14px 22px;font-size:22px;font-weight:700;line-height:1.3;border-radius:12px;box-shadow:0 4px 0 var(--acc);opacity:0;transition:.2s;pointer-events:none;text-align:center}
+.lockhint{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1d1b17e0;color:#fff;padding:6px 14px;border-radius:999px;font-size:14px;display:none;pointer-events:none}.lockhint.on{display:block}
+#bsock{display:none;background:#fff;color:#c8202a;box-shadow:0 4px 0 #c8202a}#bsock.on{display:block}#bkick{display:none;background:#fff;color:#1f4d3a}#bkick.on{display:block}
+.mute{position:fixed;top:clamp(70px,12vh,110px);right:max(3vw,12px);margin-top:clamp(150px,22vw,200px);background:#fff;color:#1f4d3a;font-weight:800;padding:6px 12px;border-radius:999px;box-shadow:0 3px 0 #1f4d3a;display:none}.mute.on{display:block}
+.endday{position:fixed;inset:0;display:none;place-items:center;background:#0c1430e6;padding:16px;z-index:5}.endday.on{display:grid}
+#edList{list-style:none;padding:0;margin:0 0 18px;text-align:left}#edList li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #1f4d3a22}#edList b{font-variant-numeric:tabular-nums}
+#edNext{font:800 18px Rubik,sans-serif;min-height:52px;padding:0 34px;border:0;border-radius:999px;background:var(--red);color:#fff;box-shadow:0 4px 0 #7a1015;cursor:pointer}
+.fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .25s}.fade.on{opacity:1}
+.tools{position:fixed;inset:0;display:none;place-items:center;background:#1f4d3a99;padding:16px}.tools.on{display:grid}
+.tbox{background:var(--cr);border-radius:16px;padding:20px;max-width:640px;width:100%;box-shadow:0 6px 0 #0003}.tbox h2{margin:0 0 12px;color:var(--acc);font-size:28px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+.tgrid button,#toolclose{font:500 15px Rubik,sans-serif;min-height:44px;border:2px solid var(--acc);border-radius:10px;background:#fff;color:var(--ink,#1d1b17);cursor:pointer}.tgrid button.cur{background:var(--acc);color:#fff}#toolclose{padding:0 20px;background:var(--acc);color:#fff}
+.taskbar{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(94vw,980px);background:#1d1b17e6;color:#fff;font-size:22px;font-weight:700;line-height:1.35;padding:10px 22px;border-radius:14px;text-align:center;pointer-events:none;display:none;z-index:3}.taskbar.on{display:block}
+@media (pointer:coarse){.taskbar{bottom:auto;top:96px;font-size:16px}}
+#bx{display:none;background:#fff;color:#1f4d3a;box-shadow:0 4px 0 #1f4d3a}#bx.on{display:block}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.prompt{position:fixed;bottom:max(120px,16vh);left:50%;transform:translateX(-50%);background:#1d1b17e0;color:#fff;padding:10px 20px;font-size:20px;font-weight:600;border-radius:999px;display:none;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
+.prompt.on{display:flex}
+kbd{background:#fff;color:#1d1b17;border-radius:6px;padding:1px 8px;font:800 14px Rubik,sans-serif}
+.joy{position:fixed;left:max(20px,env(safe-area-inset-left));bottom:max(24px,env(safe-area-inset-bottom));width:130px;height:130px;border-radius:50%;background:#ffffff40;border:3px solid #ffffff90;display:none;place-items:center;touch-action:none}
+.knob{width:54px;height:54px;border-radius:50%;background:#fff;box-shadow:0 3px 8px #0003}
+.btns{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(24px,env(safe-area-inset-bottom));display:flex;gap:10px;align-items:flex-end}
+.btns button{font:800 16px Rubik,sans-serif;min-height:48px;padding:0 16px;border:0;border-radius:999px;background:var(--cr);color:var(--acc);box-shadow:0 4px 0 var(--acc);cursor:pointer}
+#buse{display:none;width:72px;height:72px;font-size:22px;background:var(--red);color:#fff;box-shadow:0 4px 0 #7a1015}
+button:active{transform:translateY(3px)}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+@media (pointer:coarse){.joy{display:grid}#buse{display:block}.prompt kbd{display:none}}
+.ov{position:fixed;inset:0;display:grid;place-items:center;background:#1f4d3acc;backdrop-filter:blur(4px);transition:opacity .3s;padding:16px}
+.ov.hide{opacity:0;pointer-events:none}
+.ov.sel{display:block;padding:0;overflow:hidden;background:#0d2a1f;backdrop-filter:none;z-index:6}
+.selstage{position:absolute;inset:0}
+#selc{position:absolute;inset:0;width:100%;height:100%;display:block}
+.selpanel{position:absolute;z-index:2;left:clamp(12px,3vw,40px);top:12px;bottom:12px;margin:auto 0;height:max-content;max-height:calc(100% - 24px);width:min(440px,42vw);display:flex;flex-direction:column;gap:12px;background:#f4efe6f2;color:#1d1b17;border-radius:22px;padding:22px 22px 18px;box-shadow:0 10px 40px #0003;overflow:auto;animation:tin .45s ease-out both}
+.seltitle{margin:0;font-weight:800;font-size:clamp(30px,3.6vw,48px);line-height:1;letter-spacing:-.01em;color:#111}
+.selsub{margin-top:4px;font-size:13px;font-weight:500;color:#1d1b17aa;letter-spacing:.14em;text-transform:uppercase}
+@keyframes tin{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
+.selcards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.selcards button{min-height:52px;padding:6px 10px;border-radius:12px;border:2px solid #1d1b1718;background:#fff;color:#1d1b17;font:500 14px Rubik,sans-serif;text-align:left;cursor:pointer;transition:background .12s,border-color .12s}
+.selcards button:hover{border-color:#1f4d3a66}
+.selcards button b{display:block;font-weight:800;font-size:15px}
+.selcards button small{display:block;font-size:11px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.selcards button[aria-pressed=true]{background:#1f4d3a;color:#fff;border-color:#1f4d3a}
+.selcards button{position:relative}.selcards button.locked::after{content:"zamčeno";position:absolute;top:5px;right:6px;font-size:10px;font-weight:500;opacity:.8}
+.selcards button.locked{opacity:.55}
+.selcards button:focus-visible{outline:3px solid #1f4d3a;outline-offset:2px}
+.selinfo{display:flex;flex-direction:column;gap:10px;margin-top:4px;border-top:1px solid #1d1b1720;padding-top:12px}
+.selinfo h2{margin:0;font-size:24px;color:#1f4d3a;line-height:1.1}
+.selinfo p{margin:4px 0 0;font-size:14px;line-height:1.4}
+.selinfo #go{width:100%}
+@media (max-aspect-ratio:1/1){.selpanel{left:10px;right:10px;width:auto;top:auto;bottom:10px;max-height:60vh;padding:16px}.seltitle{font-size:30px}}
+#go:disabled{background:#9a9a9a;box-shadow:none;cursor:not-allowed}
+.selctrl{margin-top:8px;text-align:left;font-size:14px}.selctrl summary{cursor:pointer;font-weight:500;color:#1f4d3a}.selctrl ul{list-style:none;padding:0;margin:8px 0 0}.selctrl li{padding:4px 0;border-bottom:1px solid #1f4d3a22}
+.card{background:var(--cr);border-radius:18px;padding:26px 24px;max-width:420px;width:100%;box-shadow:0 8px 0 #0003;text-align:center}
+.card h1{margin:0;font-size:clamp(36px,9vw,52px);line-height:1.05;color:var(--acc)}
+.card .v{margin:4px 0 14px;font-size:14px;opacity:.7}
+.card ul{list-style:none;padding:0;margin:0 0 18px;text-align:left;font-size:15px}
+.card li{padding:5px 0;border-bottom:1px solid #1f4d3a22}
+#go{font:800 18px Rubik,sans-serif;min-height:52px;padding:0 34px;border:0;border-radius:999px;background:var(--red);color:#fff;box-shadow:0 4px 0 #7a1015;cursor:pointer}
+.mob{display:none}@media (pointer:coarse){.mob{display:list-item}.pc{display:none}}
+#board{position:fixed;right:10px;top:50%;transform:translateY(-50%);background:#17201de8;border-left:4px solid #d49c4c;color:white;padding:12px 16px;font:600 19px/1.5 system-ui;max-width:min(36vw,420px);pointer-events:none}#activities{white-space:pre-line}#pause{position:fixed;inset:0;z-index:100;background:#101815d9;display:grid;place-items:center;color:white}#pause[hidden],#board[hidden]{display:none}#pause .card{max-width:440px;background:#faf6e9;color:#172b21}
+#pause h1{margin-bottom:16px;color:#184530}
+#pause #objective{margin:6px 0 20px;line-height:1.5}
+#resume{padding:10px 22px;border:0;border-radius:8px;background:#184530;color:white;font:700 16px Rubik,sans-serif;cursor:pointer}
+#resume:focus-visible{outline:3px solid #172b21;outline-offset:3px}
+#pauseButton{pointer-events:auto;cursor:pointer;background:#184530;color:#fff;border:1px solid #fff8;border-radius:6px;padding:5px 9px;font:inherit}
+.wanted{position:fixed;top:10px;right:16px;z-index:4;display:none;color:#ffd23a;font-size:clamp(40px,5vw,64px);line-height:1;letter-spacing:4px;text-shadow:0 3px 0 #000,0 0 12px #000,0 0 2px #000;pointer-events:none}.wanted.on{display:block}
+#radar{position:fixed;left:18px;bottom:18px;width:clamp(170px,20vw,240px);height:auto;border-radius:50%;border:5px solid #111;box-shadow:0 0 0 3px #fff,0 6px 20px #0006;display:none;z-index:3;pointer-events:none}#radar.on{display:block}
+@media (pointer:coarse){#radar{left:auto;right:12px;bottom:auto;top:120px;width:150px}}
+#money,#energy{display:inline-block;margin-top:6px;background:#ffffffd9;color:#1f4d3a;font-weight:700;font-size:14px;padding:3px 10px;border-radius:999px}#money.neg{background:#b51e24;color:#fff}#energy.low{background:#e8742a;color:#fff}
+.moneyfx{position:fixed;top:64px;left:50%;transform:translateX(-50%);font:800 34px Rubik,sans-serif;opacity:0;transition:opacity .25s,top .6s;pointer-events:none;z-index:6;text-shadow:0 2px 0 #000,0 0 8px #000}.moneyfx.on{opacity:1;top:84px}.moneyfx.plus{color:#7dff7a}.moneyfx.minus{color:#ff6a5a}
+.shopui{z-index:20}.sgrid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}.sgrid button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;text-align:left}.sgrid button b{font-size:15px}.sgrid button span{font-size:12px;opacity:.75}.sgrid button i{font-style:normal;font-weight:800;color:var(--acc)}.sgrid button:disabled{opacity:.45;cursor:default}#shopfoot{margin:0 0 10px;font-size:14px}#shopclose{font:500 15px Rubik,sans-serif;min-height:44px;border:0;border-radius:10px;padding:0 20px;background:var(--acc);color:#fff;cursor:pointer}
+.mini{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);width:min(520px,90vw);background:#17201dee;color:#fff;border-radius:14px;padding:14px 18px;display:none;flex-direction:column;gap:8px;z-index:15;font:600 16px Rubik,sans-serif}.mini.on{display:flex}.mbar{position:relative;height:26px;background:#3a4440;border-radius:8px;overflow:hidden}#minizone{position:absolute;top:0;bottom:0;background:#4fd65a}#mininee{position:absolute;top:-2px;bottom:-2px;width:5px;margin-left:-2px;background:#ffd23a;box-shadow:0 0 6px #000}.mini small{opacity:.7;font-weight:400}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="wanted" class="wanted"></div>
+<canvas id="radar" width="260" height="260"></canvas>
+<div class="top"><div><span class="logo">The Parkside</span><span id="who">Pavel</span> <span id="clock">den 08:00</span> <span id="money">5 000 Kč</span> <span id="energy">⚡ 100</span> <button id="pauseButton" type="button" hidden>Pauza · Esc</button></div><canvas id="mm" width="300" height="340"></canvas></div>
+<input id="portraitFile" type="file" accept="image/*" hidden>
+<aside id="board" hidden><strong id="boardT">Dění na dvorku</strong><div id="activities"></div></aside>
+<div id="pause" hidden role="dialog" aria-modal="true"><div class="card"><h1>Pauza</h1><b>Aktuální úkol</b><p id="objective"></p><button id="resume" type="button">Pokračovat</button> <button id="saveBtn" type="button" style="padding:10px 22px;border:0;border-radius:8px;background:#d49c4c;color:#fff;font:700 16px Rubik,sans-serif;cursor:pointer">Uložit hru</button></div></div>
+<div class="bubble"  id="haf">HAF!</div>
+<div class="heart" id="heart">♥</div>
+<div class="toast" id="toast"></div>
+<div class="moneyfx" id="moneyfx"></div>
+<div class="tools shopui" id="shopui"><div class="tbox"><h2 id="shoptitle">Obchod</h2><div class="tgrid sgrid" id="shopgrid"></div><p id="shopfoot"></p><button type="button" id="shopclose" onclick="document.getElementById('shopui').classList.remove('on')">Zavřít (E)</button></div></div>
+<div class="mini" id="mini"><b id="minititle">Práce</b><div id="tablePlan" hidden><svg viewBox="0 0 320 110" width="280" role="img" aria-label="Výkres stolu, půdorys 120 krát 60 a nárys vysoký 75 centimetrů"><rect width="320" height="110" fill="#193651"/><g fill="none" stroke="#cceeff" stroke-width="2"><rect x="15" y="28" width="108" height="54"/><path d="M169 28h108v5H169z M172 33v62h5V33 M269 33v62h5V33 M177 42h92"/></g><g fill="white" font-size="12"><text x="42" y="20">120 cm</text><text x="43" y="60">60 cm</text><text x="282" y="68">75 cm</text></g></svg></div><div class="mbar"><div id="minizone"></div><div id="mininee"></div></div><span id="minicnt"></span><small>Mačkej E nebo mezerník, když je ručička v zelené</small></div>
+<div class="taskbar" id="taskbar"></div>
+<div class="fade" id="fade"></div>
+<div class="endday" id="endday"><div class="card"><h1 id="edTitle">Konec dne</h1><div class="v">Půlnoc · pauza · všichni spí (Tereza v Bytě 1, Pavel ve svém bytě)</div><ul id="edList"></ul><button id="edNext" type="button">Probudit se ráno</button></div></div>
+<div class="tools" id="tools"><div class="tbox"><h2>Nářadí</h2><div class="tgrid" id="toolgrid"></div><button type="button" id="toolclose">Zavřít</button></div></div>
+<div class="mute" id="mute"></div>
+<div class="lockhint" id="lockhint">Klikni do hry pro ovládání kamery myší · Esc pozastaví hru · F1 zobrazí ovládání</div>
+<div class="prompt" id="prompt"><kbd>E</kbd><span id="ptext"></span></div>
+<div class="joy" id="joy"><div class="knob" id="knob"></div></div>
+<div class="btns"><button id="bswitch" type="button">⇄ Simon</button><button id="bx" type="button">X Ashley</button><button id="bsock" type="button">Ponožka</button><button id="bkick" type="button">Kopnout</button><button id="buse" type="button" aria-label="Akce">E</button></div>
+<div class="ov sel" id="ov">
+<div class="selstage"><canvas id="selc"></canvas></div>
+<div class="selpanel">
+<div><h1 class="seltitle">THE PARKSIDE</h1><div class="selsub">Vyber postavu</div></div>
+<div class="selcards" id="selcards"></div>
+<div class="selinfo"><div><h2 id="selname"></h2><p id="seldesc"></p>
+<details class="selctrl"><summary>Ovládání</summary><ul>
+<li><b>F1</b> legenda ovládání · <b>U</b> držet při akceleraci pro turbo (Simonův Golf)</li>
+<li class="pc"><b>V</b> první / třetí osoba, <b>P</b> dát psovi pamlsek, <b>I</b> převzít blízkou postavu / vrátit se, <b>↑</b> telefon, <b>Space</b> skok, <b>WASD</b> chůze, <b>Shift</b> běh, <b>myš</b> rozhlížení, <b>kolečko</b> zoom, <b>Esc</b> pauza</li>
+<li class="pc"><b>E</b> akce / úkol, <b>Q</b> přepnout postavu (Pavel → Simon → Tereza), <b>X</b> za Terezu hrát za Ashley / Nikíska</li>
+<li class="pc"><b>F</b> odkopnout Bobana, <b>T</b> ponožka na hubu, <b>G / klik</b> použít nářadí, <b>B</b> odhodit nářadí/díl, <b>R</b> když se zasekneš</li>
+<li class="pc"><b>K</b> zakázky (peníze), <b>V</b> prodat kradené auto Simonovi (před garáží), <b>E</b> u obchodů nákup – Lidl, Benapol, Pekařství Křížkovi, COOP</li>
+<li class="pc"><b>F u auta</b> nastoupit / ukrást (W/S plyn a brzda, A/D zatáčení, <b>mezerník</b> ruční brzda, <b>Y</b> rádio, <b>H</b> troubení, F vystoupit), <b>E u brány / garáže</b> otevřít</li>
+<li class="pc"><b>M</b> velká mapa + waypointy, <b>L</b> psi na vodítko, <b>O</b> kvalita grafiky, <b>N</b> hudba, <b>J</b> přeskočit na večer/ráno</li>
+<li class="mob"><b>Joystick vlevo</b> chůze, <b>tažení prstem</b> kamera, tlačítka vpravo dole akce</li>
+</ul></details></div>
+<button id="go" type="button">Hrát</button></div>
+</div>
+</div>
+<script src="downloaded/three.min.js"></script>
+<script src="simon-foto.js"></script>
+<script src="characters.js"></script>
+
+<dialog id="phone"><header><strong>Telefon</strong> <button id="phoneHome">Domů</button> <button onclick="this.closest('dialog').close()">Zavřít</button></header><h3></h3><section></section></dialog>
+<style>#phone{width:min(340px,85vw);background:#152029;border:5px solid #34424d;border-radius:22px;padding:20px;color:white}#phone header{display:flex;justify-content:space-between;align-items:center}#phone section button{display:block;width:100%;margin:6px 0;padding:10px;text-align:left;color:white;background:#314453;border:0;border-radius:6px}#phone input{padding:8px;width:90%}</style><dialog id="cameraTV"><h2>Bezpečnostní kamery</h2><select id="cameraSelect" aria-label="Kamera"></select><canvas id="cameraPicture" width="640" height="360"></canvas><button id="cameraCatch"></button><button onclick="this.parentNode.close()">Vypnout televizi</button></dialog>
+<dialog id="keyLegend"><h2>Ovládání</h2><ul></ul><button onclick="this.parentNode.close()">Zpět do hry</button></dialog>
+<style>dialog{background:#182222;color:#fff;border:1px solid #768579;border-radius:8px;max-width:90vw;max-height:85vh}dialog::backdrop{background:#0009}#cameraPicture{display:block;width:min(640px,80vw);height:auto;margin:10px 0}#keyLegend li{margin:.5em 0}</style>
+<script>
+const legend=document.getElementById('keyLegend');
+legend.querySelector('ul').innerHTML=document.querySelector('.selctrl ul').innerHTML;
+window.addEventListener('keydown',e=>{
+ const modal=document.querySelector('dialog[open]');
+ if(e.code==='F1'||modal){e.stopImmediatePropagation();if(e.code==='F1'||e.code==='Escape'){e.preventDefault();if(e.repeat)return;if(modal)modal.close();else{if(document.pointerLockElement)document.exitPointerLock();legend.showModal()}}}
+},true);
+</script><script src="game.js"></script></body>
+</html>
